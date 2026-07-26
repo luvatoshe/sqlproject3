@@ -1,0 +1,14 @@
+-- Create table employee_salary
+
+create table employee_salary (
+    employee_id     number,
+    salary          number,
+    effecvtive_date date,
+    valid_from      timestamp,
+    valid_to        timestamp,
+    current_flag    char(1) check (current_flag in ('Y', 'N')),
+    constraint pk_employees_salary primary key (employee_id, valid_from)
+);
+
+create index idx_employees_salary_current on employee_salary(employee_id, current_flag);
+create index idx_employees_salary_validity on employee_salary(employee_id, valid_from, valid_to);
