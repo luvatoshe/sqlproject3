@@ -1,0 +1,94 @@
+-- Create a type to return the result
+drop function get_salary_history;
+drop type salary_history_table;
+drop type salary_history_row;
+/
+
+create or replace type salary_history_row as object (
+    employee_id    number,
+    salary         number,
+    effective_date date,
+    valid_from     timestamp,
+    valid_to       timestamp,
+    current_flag   char(1)
+);
+/
+
+create or replace type salary_history_table as table of salary_history_row;
+/
+
+-- Pipeline function
+
+create or replace function get_salary_history (
+    p_employee_id number,
+    p_as_of_date  date default null) return salary_history_table pipelined
+as
+    v_flashback_time timestamp;
+    v_error_msg varchar2(4000);
+begin
+    begin
+        if p_employee_id is null then
+            raise_application_error(-20010, 'Employee ID cannot be NULL');
+        end if;
+        
+        if p_as_of_date is null then
+            for rec in (select employee_id,
+                               salary,
+                               effective_date,
+                               valid_from,
+                               valid_to,
+                               current_flag
+                        from employee_salary
+                        where employee_id = p_employee_id
+                        and current_flag = 'Y'
+                        order by valid_from desc
+            ) loop
+                pipe row (
+                    salary_history_row(
+                        rec.employee_id,
+                        rec.salary,
+                        rec.effective_date,
+                        rec.valid_from,
+                        rec.valid_to,
+                        rec.current_flag
+                    )
+                );
+            end loop;
+        else
+            v_flashback_time := cast(p_as_of_date as timestamp);
+            
+            for rec in (
+                select employee_id,
+                       salary,
+                       effective_date,
+                       valid_from,
+                       valid_to,
+                       current_flag
+                from employee_salary
+                as of timestamp v_flashback_time
+                where employee_id = p_employee_id
+                order by valid_from desc
+            ) loop
+                pipe row (
+                    salary_history_row(
+                        rec.employee_id,
+                        rec.salary,
+                        rec.effective_date,
+                        rec.valid_from,
+                        rec.valid_to,
+                        rec.current_flag
+                    )
+                );
+            end loop;
+        end if;
+        
+        return;
+        
+    exception
+        when others then
+            v_error_msg := sqlerrm;
+            raise_application_error(-20000, 'Error in get_salary_histpry: ' || v_error_msg);
+    end;
+end get_salary_history;
+/
+       
