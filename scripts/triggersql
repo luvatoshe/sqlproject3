@@ -14,7 +14,7 @@ begin
         end if;
         
         if :new.salary is null or :new.salary <= 0 then
-            raise_application_error(-20001, 'Salary must be positive number');
+            raise_application_error(-20002, 'Salary must be positive number');
         end if;
         
         for rec in (select salary,
