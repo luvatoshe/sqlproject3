@@ -1,0 +1,36 @@
+-- Test function for convenient viewing
+
+create or replace function show_salary_history(
+    p_employee_id number,
+    p_as_of_date date default null) return clob
+as
+    v_result clob;
+    v_counter number := 0;
+begin 
+    v_result :=             'Salary history for employee ' || p_employee_id || chr(10);
+    v_result := v_result || '=====================================' || chr(10);
+    
+    for rec in (select *
+                from table (get_salary_history(p_employee_id, p_as_of_date))
+                order by valid_from desc
+     ) loop
+        v_counter := v_counter + 1;
+        v_result := v_result || 'Record #'         || v_counter                                                      || chr(10);
+        v_result := v_result || 'Salary: '         || rec.salary                                                     || chr(10);
+        v_result := v_result || 'Effective Date: ' || to_char(rec.effective_date, 'YYYY-MM-DD')                      || chr(10);
+        v_result := v_result || 'Valid From: '     || to_char(rec.valid_from, 'YYYY-MM-DD HH24:MI:SS')               || chr(10);
+        v_result := v_result || 'Valid To: '       || nvl(to_char(rec.valid_to, 'YYYY-MM-DD HH24:MI:SS'), 'Current') || chr(10);
+        v_result := v_result || 'Current Flag: '   || rec.current_flag                                               || chr(10);
+        v_result := v_result || '----------------------------------'                                                 || chr(10);
+    end loop;
+    
+    if v_counter = 0 then
+        v_result := v_result || 'No records found for employee ' || p_employee_id;
+    else
+        v_result := v_result || 'Total records: ' || v_counter;
+    end if;
+    
+    return v_result;
+end show_salary_history;
+/
+            
