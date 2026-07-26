@@ -1,0 +1,22 @@
+-- Create view employee_salary_view
+
+create or replace view employee_salary_view
+as
+select employee_id,
+       salary,
+       effecvtive_date,
+       valid_from,
+       valid_to,
+       current_flag
+from   employee_salary;
+
+-- Create audit table
+
+create table audit_salary_changes (audit_id    number generated always as identity primary key,
+                                   employee_id number,
+                                   old_salary  number,
+                                   new_salary  number,
+                                   change_date timestamp default SYSTIMESTAMP,
+                                   changed_by  varchar2(100) default user,
+                                   action_type varchar(20)
+);
