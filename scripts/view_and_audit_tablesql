@@ -1,10 +1,11 @@
 -- Create view employee_salary_view
 
+
 create or replace view employee_salary_view
 as
 select employee_id,
        salary,
-       effecvtive_date,
+       effective_date,
        valid_from,
        valid_to,
        current_flag

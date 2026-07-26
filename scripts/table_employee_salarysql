@@ -3,7 +3,7 @@
 create table employee_salary (
     employee_id     number,
     salary          number,
-    effecvtive_date date,
+    effective_date date,
     valid_from      timestamp,
     valid_to        timestamp,
     current_flag    char(1) check (current_flag in ('Y', 'N')),
