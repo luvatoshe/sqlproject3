@@ -1,0 +1,85 @@
+-- Create trigger 'instead of'
+
+create or replace trigger trg_employee_salary_view
+instead of insert or update on employee_salary_view
+for each row
+declare
+    v_old_salary number;
+    v_error_msg varchar2(4000);
+begin
+    begin
+        -- Error handling
+        if :new.employee_id is null then
+            raise_application_error(-20001, 'Employee ID cannot be NULL');
+        end if;
+        
+        if :new.salary is null or :new.salary <= 0 then
+            raise_application_error(-20001, 'Salary must be positive number');
+        end if;
+        
+        for rec in (select salary,
+                           valid_from,
+                           valid_to
+                    from employee_salary
+                    where employee_id = :new.employee_id
+                    and current_flag = 'Y'
+                    ) loop
+                    
+            v_old_salary := rec.salary;
+            
+            update employee_salary
+            set
+                valid_to = SYSTIMESTAMP,
+                current_flag = 'N'
+            where employee_id = :new.employee_id
+            and current_flag = 'Y';
+        end loop;
+        
+        insert into employee_salary (employee_id,
+                                      salary,
+                                      effective_date,
+                                      valid_from,
+                                      valid_to,
+                                      current_flag
+                                ) values (
+                                       :new.employee_id,
+                                       :new.salary,
+                                       coalesce(:new.effective_date, sysdate),
+                                       SYSTIMESTAMP,
+                                       null,
+                                       'Y'
+                                );
+        
+        if v_old_salary is not null then
+            insert into audit_salary_changes (employee_id,
+                                              old_salary,
+                                              new_salary,
+                                              action_type
+                                              ) values (:new.employee_id,
+                                                        v_old_salary,
+                                                        :new.salary,
+                                                        'UPDATE'
+                                                        );
+        else
+            insert into audit_salary_changes (employee_id,
+                                              old_salary,
+                                              new_salary,
+                                              action_type
+                                              ) values (:new.employee_id,
+                                                        null,
+                                                        :new.salary,
+                                                        'INSERT'
+                                                        );
+        end if;
+        
+    exception
+        when others then
+            v_error_msg := sqlerrm;
+            rollback;
+            raise_application_error(-20000, 'Error in salary update: ' || v_error_msg);  
+    end;
+end trg_employee_salary_view;
+/
+        
+        
+        
