@@ -1,0 +1,95 @@
+-- Procedure compare_salaries
+
+create or replace procedure compare_salaries (
+    p_employee_id in  number,
+    p_report      out clob
+)
+as
+    v_start_date     date := trunc(sysdate) - 180;
+    v_end_date       date := trunc(sysdate);
+    v_month_start    date;
+    v_month_end      date;
+    v_first_salary   number;
+    v_last_salary    number;
+    v_report         clob;
+    v_flashback_time timestamp;
+    v_error_msg      varchar2(4000);
+begin
+    begin
+        if p_employee_id is null then
+            raise_application_error(-20020, 'Employee ID cannot be NULL');
+        end if;
+        
+        v_report := 'Salary Comparison for Employee: ' || p_employee_id || chr(10);
+        v_report := v_report || '=============================================' || chr(10);
+        v_report := v_report || 'Report period: ' || to_char(v_start_date, 'YYYY-MM-DD') ||
+                             ' to ' || to_char(v_end_date, 'YYYY-MM-DD') || chr(10);
+        v_report := v_report || '=============================================' || chr(10);
+        
+        v_month_start := trunc(v_start_date, 'MM');
+        
+        while v_month_start <= v_end_date loop
+            v_month_end := last_day(v_month_start);
+            
+            begin
+                v_flashback_time := cast(v_month_start as timestamp);
+                
+                select salary 
+                into   v_first_salary
+                from   employee_salary
+                as of timestamp v_flashback_time
+                where employee_id = p_employee_id
+                and   current_flag = 'Y'
+                and   rownum = 1;
+            exception
+                when no_data_found then
+                    v_first_salary := null;
+            end;
+            
+            begin
+                v_flashback_time := cast(
+                    v_month_end + numtodsinterval(23 * 3600 + 59 * 60 + 59, 'second') 
+                    as timestamp
+                );
+                
+                select salary 
+                into   v_last_salary
+                from   employee_salary
+                as of timestamp v_flashback_time
+                where employee_id = p_employee_id
+                and   current_flag = 'Y'
+                and   rownum = 1;
+            exception
+                when no_data_found then
+                    v_last_salary := null;
+            end;
+            
+            v_report := v_report || 'Month: ' || to_char(v_month_start, 'YYYY-MM') || chr(10);
+            v_report := v_report || 'First day salary: ' || nvl(to_char(v_first_salary, '999,999.99'), 'N/A') 
+                                 || chr(10);
+            v_report := v_report || 'Last day salary: ' || nvl(to_char(v_last_salary, '999,999.99'), 'N/A') 
+                                 || chr(10);
+                                 
+            if v_first_salary is not null and v_last_salary is not null then
+                v_report := v_report || ' DIfference: ' || 
+                                        to_char(((v_last_salary - v_first_salary) / v_first_salary) * 100, '999.99')
+                                        || '%' || chr(10);
+            end if;
+            
+            v_report := v_report || '---------------------------------------------' || chr(10);
+            
+            v_month_start := add_months(v_month_start, 1);
+        end loop;
+        
+        p_report := v_report;
+    
+    exception
+        when others then
+            v_error_msg := sqlerrm;
+            p_report    := 'Error in compare_salaries: ' || v_error_msg;
+            raise_application_error(-20021, 'Error in compare_salaries: ' || v_error_msg);
+    end;
+end compare_salaries;
+/
+    
+                                    
